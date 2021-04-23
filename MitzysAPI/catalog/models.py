@@ -1,4 +1,5 @@
 from django.db import models
+from users.models import User
 import string
 import random
 import base64
@@ -84,3 +85,4 @@ class Order(models.Model):
                                default=generate_unique_code, 
                                unique=True,
                                editable=False)
+    owner = models.ForeignKey(User, on_delete=models.PROTECT, null=True)

@@ -114,3 +114,5 @@ GitHub.sublime-settings
 !.vscode/launch.json 
 !.vscode/extensions.json 
 .history
+MitzysAPI/catalog/__pycache__/admin.cpython-39.pyc
+MitzysAPI/catalog/__pycache__/models.cpython-39.pyc

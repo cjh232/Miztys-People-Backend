@@ -29,7 +29,7 @@ class BrandAdmin(admin.ModelAdmin):
     list_display = ('id', 'name')
 
 class OrderAdmin(admin.ModelAdmin):
-    list_display = ('id', 'item' )
+    list_display = ('id', 'item', 'owner')
 
 
 
