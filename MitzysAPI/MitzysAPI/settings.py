@@ -90,7 +90,7 @@ WSGI_APPLICATION = 'MitzysAPI.wsgi.application'
 DATABASES = {
     'default': {
         'ENGINE': 'django.db.backends.postgresql_psycopg2',
-        'NAME': 'postgres',
+        'NAME': 'django',
         'USER': 'postgres',
         'PASSWORD': os.getenv('DB_PSWD'),
         'HOST': 'localhost',

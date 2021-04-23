@@ -8,8 +8,10 @@ import uuid
 def generate_unique_product_code():
     return uuid.uuid4().hex[:6].upper()
 
-def generate_unique_item_code():
-    return uuid.uuid4().hex
+def generate_unique_code():
+    return uuid.uuid4()
+
+
 
 
 class Category(models.Model):
@@ -63,7 +65,7 @@ class Product(models.Model):
 
 class Item(models.Model):
     item_id = models.UUIDField(primary_key=True,
-                               default=generate_unique_item_code, 
+                               default=generate_unique_code, 
                                unique=True,
                                editable=False)
     size = models.CharField(max_length=30, default="Unavailable")
@@ -75,6 +77,10 @@ class Item(models.Model):
         return f'{self.product.title} in size {self.size}'
 
 
+
 class Order(models.Model):
     item = models.ForeignKey(Item, on_delete=models.PROTECT)
-    order_id = models.AutoField(primary_key=True)
+    id = models.UUIDField(primary_key=True,
+                               default=generate_unique_code, 
+                               unique=True,
+                               editable=False)
