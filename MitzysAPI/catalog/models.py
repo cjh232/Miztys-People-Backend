@@ -6,20 +6,10 @@ import uuid
 
 # Create your models here.
 def generate_unique_product_code():
-    code = uuid.uuid4().hex
-
-    while Product.objects.filter(product_id=code).exists():
-        code = uuid.uuid4().hex
-    
-    return code
+    return uuid.uuid4().hex[:6].upper()
 
 def generate_unique_item_code():
-    code = uuid.uuid4().hex
-
-    while Item.objects.filter(item_id=code).exists():
-        code = uuid.uuid4().hex
-    
-    return code
+    return uuid.uuid4().hex
 
 
 class Category(models.Model):
@@ -27,7 +17,8 @@ class Category(models.Model):
     name = models.CharField(max_length=30, default=" ")
     description = models.TextField(max_length=150, default=" ")
     parent = models.ForeignKey('self', 
-                                null=True, 
+                                null=True,
+                                blank=True, 
                                 on_delete=models.CASCADE,
                                 limit_choices_to={'is_child': False})
     is_child = models.BooleanField(default=False)
@@ -46,7 +37,11 @@ class Brand(models.Model):
         return self.name
 
 class Product(models.Model):
-    product_id = models.UUIDField(primary_key=True, default=generate_unique_product_code, editable=False)
+    product_id = models.CharField(primary_key=True,
+                               default=generate_unique_product_code, 
+                               unique=True, 
+                               editable=False,
+                               max_length=30)
     title = models.CharField(max_length=150)
     details = models.TextField(max_length=600, default=" ")
     date_added = models.DateTimeField(auto_now_add=True)
@@ -67,13 +62,19 @@ class Product(models.Model):
 
 
 class Item(models.Model):
-    item_id = models.UUIDField(primary_key=True, default=generate_unique_item_code, editable=False)
+    item_id = models.UUIDField(primary_key=True,
+                               default=generate_unique_item_code, 
+                               unique=True,
+                               editable=False)
     size = models.CharField(max_length=30, default="Unavailable")
     product = models.ForeignKey(Product, on_delete=models.CASCADE)
     color = models.CharField(max_length=30)
+    is_available = models.BooleanField(default=True)
 
     def __str__(self):
         return f'{self.product.title} in size {self.size}'
 
 
-
+class Order(models.Model):
+    item = models.ForeignKey(Item, on_delete=models.PROTECT)
+    order_id = models.AutoField(primary_key=True)
