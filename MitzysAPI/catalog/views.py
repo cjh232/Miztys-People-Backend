@@ -11,6 +11,7 @@ from .serializers import *
 from django.core.exceptions import ValidationError
 from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework.filters import OrderingFilter, SearchFilter 
+from .utils.cart_utils import *
 
 
 # Create your views here.
@@ -27,6 +28,7 @@ class ProductList(generics.ListAPIView):
 
     permission_classes = [AllowAny]
     queryset = Product.objects.filter(is_available=True)
+
 
 class SearchProduct(generics.ListAPIView):
     serializer_class = ProductSerializer
@@ -91,8 +93,8 @@ class ProductView(APIView):
     def get_product_available_colors(self, product_id):
         items = Item.objects.filter(product_id=product_id).distinct('color')
 
-        res = items.values_list('color', flat=True)
-        return res
+        return items.values_list('color', flat=True)
+
 
     def get(self, request, p_id=None, format=None):
 
@@ -123,42 +125,35 @@ class ProductView(APIView):
         return Response(data, status=status.HTTP_200_OK)
 
 
-class CreateOrderView(APIView):
+class CheckoutView(APIView):
     permission_classes = [AllowAny]
-
-    def get(self, request, format=None):
-
+    
+    def post(self, request, format=None):
         data = request.data
+        user = request.user
 
-        product_id = data["product_id"]
-        size = data["size"]
-        color = data["color"]
-        
-        item_queryset = Item.objects.filter(product__product_id=product_id,
-                                            size=size,
-                                            color=color).exclude(is_available=False)
+        user_cart = Cart.objects.get(owner=user)
+        user_order = Order(owner=user)
+        cart_items = CartItem.objects.filter(cart=user_cart)
 
-        if not item_queryset.exists():
-            response_data = {
-                "msg": "Unfortunately, this item is unavailable.",
+        invalid_cart_items = get_invalid_cart_items(cart_items)
+
+        if len(invalid_cart_items) > 0:
+            data = {
+                "msg": "Some items in the cart are not available.",
+                "invalid_cart_items": invalid_cart_items,
                 "error": True
             }
+            return Response(
+                data, status=status.HTTP_409_CONFLICT
+            )
+        else:
+            user_order.save()
+            create_order_items(cart_items, user_order)
+            user_cart.status = 'F'
+            user_cart.save()
+            return Response(status=status.HTTP_200_OK)
 
-            return Response(response_data, status=status.HTTP_404_NOT_FOUND)
-        
-        item_to_order = item_queryset[0]
 
-        item_to_order.is_available = False
-        item_to_order.save()
 
-        new_order = Order(item=item_to_order)
-        new_order.save()
 
-        print(new_order.id)
-
-        response_data = {
-            "item_id": item_to_order.item_id,
-            "order_id": new_order.id
-        }
-
-        return Response(response_data, status=status.HTTP_200_OK)

@@ -40,7 +40,7 @@ class Brand(models.Model):
         return self.name
 
 class Product(models.Model):
-    product_id = models.CharField(primary_key=True,
+    id = models.CharField(primary_key=True,
                                default=generate_unique_product_code, 
                                unique=True, 
                                editable=False,
@@ -65,7 +65,7 @@ class Product(models.Model):
 
 
 class Item(models.Model):
-    item_id = models.UUIDField(primary_key=True,
+    id = models.UUIDField(primary_key=True,
                                default=generate_unique_code, 
                                unique=True,
                                editable=False)
@@ -78,11 +78,65 @@ class Item(models.Model):
         return f'{self.product.title} in size {self.size}'
 
 
-
-class Order(models.Model):
-    item = models.ForeignKey(Item, on_delete=models.PROTECT)
+class Cart(models.Model):
     id = models.UUIDField(primary_key=True,
                                default=generate_unique_code, 
                                unique=True,
                                editable=False)
+
+    owner = models.ForeignKey(User, on_delete=models.CASCADE, null=False)
+    
+    ABANDONED = 'A'
+    FINISHED = 'F'
+    ONGOING = 'O'
+    
+    STATUS_CHOICES = [
+        (ABANDONED, 'Abandoned'),
+        (FINISHED,  'Finished'),
+        (ONGOING,  'Ongoing'),
+    ]
+
+    status = models.CharField(
+        max_length=2,
+        choices=STATUS_CHOICES,
+        default=ONGOING
+    )
+
+    created_at = models.DateTimeField(auto_now_add=True)
+
+class CartItem(models.Model):
+    id = models.UUIDField(primary_key=True,
+                               default=generate_unique_code, 
+                               unique=True,
+                               editable=False)
+
+    cart = models.ForeignKey(Cart, on_delete=models.CASCADE)
+
+    size = models.CharField(max_length=30, default="Unavailable")
+    product = models.ForeignKey(Product, on_delete=models.CASCADE, null=True)
+    color = models.CharField(max_length=30, default="Unavailable")
+    # item = models.ForeignKey(Item, on_delete=models.CASCADE)
+    created_at = models.DateTimeField(auto_now_add=True)
+
+
+class Order(models.Model):
+    id = models.UUIDField(primary_key=True,
+                               default=generate_unique_code, 
+                               unique=True,
+                               editable=False)
+    date_added = models.DateTimeField(auto_now_add=True)
     owner = models.ForeignKey(User, on_delete=models.PROTECT, null=True)
+    quantity = models.IntegerField(default=1)
+
+    def __str__(self):
+        return f'{self.id} ({self.quantity})'
+
+class OrderItem(models.Model):
+    id = models.UUIDField(primary_key=True,
+                               default=generate_unique_code, 
+                               unique=True,
+                               editable=False)
+                               
+    order = models.ForeignKey(Order, on_delete=models.CASCADE)
+    item = models.ForeignKey(Item, on_delete=models.CASCADE)
+    created_at = models.DateTimeField(auto_now_add=True)
