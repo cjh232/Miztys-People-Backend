@@ -11,14 +11,13 @@ class ProductSerializer(serializers.ModelSerializer):
     class Meta:
         model = Product
         fields = [
-            'product_id',
+            'id',
             'title',
             'category_name',
             'sub_category_name',
             'brand',
             'is_available'
         ]
-
 
 class ItemsSerializer(serializers.ModelSerializer):
     product_id = serializers.ReadOnlyField(source='product.id')
@@ -36,21 +35,3 @@ class ItemsSerializer(serializers.ModelSerializer):
             'size',
             'color'
         ]
-
-class OrderSerializer(serializers.ModelSerializer):
-
-    class Meta:
-        model = Order
-        fields = [
-            'id',
-            'date_added',
-            'quantity',
-        ]
-
-class OrderItemSerializer(serializers.ModelSerializer):
-
-    item = ItemsSerializer()
-
-    class Meta:
-        model = OrderItem
-        fields = '__all__'
