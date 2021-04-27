@@ -4,10 +4,11 @@ from rest_framework import status, generics
 from rest_framework.response import Response
 from rest_framework.views import APIView
 from rest_framework.filters import OrderingFilter, SearchFilter
-from django_filters.rest_framework import DjangoFilterBackend 
+from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework.permissions import AllowAny
 from django.core.exceptions import ValidationError
 from .models import *
+
 
 # Create your views here.
 class ProductList(generics.ListAPIView):
@@ -18,7 +19,6 @@ class ProductList(generics.ListAPIView):
 
     # Default order
     ordering = ['date_added']
-
 
     permission_classes = [AllowAny]
     queryset = Product.objects.filter(is_available=True)
@@ -44,10 +44,9 @@ class GetAvailableSizes(APIView):
     def get_queryset(self):
 
         return Item.objects.filter(
-            product__id = self.request.query_params.get("product_id"),
+            product__id=self.request.query_params.get("product_id"),
             num_available__gte=1
         )
-
 
     def get(self, request, format=None):
 
@@ -84,7 +83,8 @@ class ProductDetailsView(APIView):
     permission_classes = [AllowAny]
     lookup_url_kwarg = 'product_id'
 
-    def get_product_available_colors(self, product_id):
+    @staticmethod
+    def get_product_available_colors(product_id):
         items = Item.objects.filter(
             product__id=product_id,
             num_available__gte=1
@@ -92,16 +92,15 @@ class ProductDetailsView(APIView):
 
         return items.values_list('color', flat=True)
 
-
     def get(self, request, p_id=None, format=None):
 
         try:
             product_queryset = Product.objects.filter(id=p_id, is_available=True)
         except ValidationError as error:
-              return Response({
-                  "msg": "Given product id is formatted incorrectly.",
-                  "error": True
-              }, status=status.HTTP_400_BAD_REQUEST)
+            return Response({
+                "msg": "Given product id is formatted incorrectly.",
+                "error": True
+            }, status=status.HTTP_400_BAD_REQUEST)
 
         if not product_queryset.exists():
             return Response({

@@ -8,26 +8,27 @@ from products.models import Product, Item
 def generate_unique_code():
     return uuid.uuid4()
 
+
 class Cart(models.Model):
     id = models.UUIDField(primary_key=True,
-                               default=generate_unique_code, 
-                               unique=True,
-                               editable=False)
+                          default=generate_unique_code,
+                          unique=True,
+                          editable=False)
 
     owner = models.ForeignKey(
-        User, 
-        on_delete=models.CASCADE, 
+        User,
+        on_delete=models.CASCADE,
         null=False,
         related_name="cart_owner")
-    
+
     ABANDONED = 'A'
     FINISHED = 'F'
     ONGOING = 'O'
-    
+
     STATUS_CHOICES = [
         (ABANDONED, 'Abandoned'),
-        (FINISHED,  'Finished'),
-        (ONGOING,  'Ongoing'),
+        (FINISHED, 'Finished'),
+        (ONGOING, 'Ongoing'),
     ]
 
     status = models.CharField(
@@ -41,11 +42,15 @@ class Cart(models.Model):
 
 class CartItem(models.Model):
     id = models.UUIDField(primary_key=True,
-                               default=generate_unique_code, 
-                               unique=True,
-                               editable=False)
+                          default=generate_unique_code,
+                          unique=True,
+                          editable=False)
 
-    cart = models.ForeignKey(Cart, on_delete=models.CASCADE)
+    cart = models.ForeignKey(
+        Cart,
+        on_delete=models.CASCADE,
+        related_name="cart_items"
+    )
 
     item = models.ForeignKey(
         Item,
@@ -54,3 +59,6 @@ class CartItem(models.Model):
     )
     quantity = models.IntegerField()
     created_at = models.DateTimeField(auto_now_add=True)
+
+    def __str__(self):
+        return f'{self.item.id}'

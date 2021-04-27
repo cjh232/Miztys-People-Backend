@@ -47,7 +47,6 @@ INSTALLED_APPS = [
     'rest_framework',
     'rest_framework_simplejwt.token_blacklist',
     'django_crontab',
-    'catalog.apps.CatalogConfig',
     'django_filters',
     'corsheaders',
     'products',

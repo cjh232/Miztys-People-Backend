@@ -8,6 +8,8 @@ from rest_framework.permissions import AllowAny
 from django.core.exceptions import ValidationError, ObjectDoesNotExist 
 from .models import *
 from products.models import Item
+from .utils import *
+from .serializers import *
 
 # Create your views here.
 
@@ -16,24 +18,10 @@ class AddItemToCartView(APIView):
     item_id_query_lookup = 'item_id'
     quantity_query_lookup = 'quantity'
 
-    def get_or_create_user_cart(self, user):
-
-        cart_queryset = Cart.objects.filter(
-            owner=user,
-            status='O'
-        )
-
-        if not cart_queryset.exists():
-            new_cart = Cart(owner=user)
-            new_cart.save()
-            return new_cart
-        else:
-            return cart_queryset[0]
-
     def post(self, request, Format=None):
         user = request.user
 
-        user_cart = self.get_or_create_user_cart(user)
+        user_cart = get_or_create_user_cart(user)
 
         item_id = request.query_params.get(self.item_id_query_lookup)
         quantity = request.query_params.get(self.quantity_query_lookup)        
@@ -115,5 +103,55 @@ class EditCartItemView(APIView):
 
         return Response(response_data, status=status.HTTP_204_NO_CONTENT)
             
-        
+class DeleteCartItemView(APIView):
+
+    permission_classes = [AllowAny]
+    cart_item_id_lookup_keyword = 'cart_item_id'
+    
+    def delete(self, request, format=None):
+        user = request.user
+        cart_item_id = request.query_params.get(self.cart_item_id_lookup_keyword)
+
+        try:
+            cart_item = CartItem.objects.get(id=cart_item_id)
+        except ObjectDoesNotExist as error:
+
+            return Response(
+            {
+                "msg": "No cart item was found under the given id.",
+                "error": True
+            }, 
+            status=status.HTTP_404_NOT_FOUND)
+
+        if cart_item.cart.owner != user:
+
+            return Response(
+                {
+                    "msg": "This account is not authorized to take this action.",
+                    "error": True
+                },
+                status = status.HTTP_403_FORBIDDEN
+            )
+
+        cart_item.delete()
+
+        response_data = {
+            "msg": "Cart item successfully deleted!",
+            "error": False
+        }
+
+        return Response(response_data, status=status.HTTP_204_NO_CONTENT)
+
+class CartDetailView(APIView):
+
+    permission_classes = [AllowAny]
+
+    def get(self, request, format=None):
+        user = request.user
+
+        user_cart = get_or_create_user_cart(user)
+
+        serializer = CartSerializer(user_cart)
+
+        return Response(serializer.data, status=status.HTTP_200_OK)
 

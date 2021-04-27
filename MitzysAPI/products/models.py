@@ -68,7 +68,7 @@ class Item(models.Model):
     is_available = models.BooleanField(default=True)
 
     def __str__(self):
-        return f'{self.product.title} in size {self.size}'
+        return f'{self.product.title} in size {self.size} in color {self.color}'
 
     class Meta:
         unique_together =['product', 'size', 'color']
