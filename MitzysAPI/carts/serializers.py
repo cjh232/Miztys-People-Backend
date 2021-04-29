@@ -13,7 +13,6 @@ class CartItemSerializer(serializers.ModelSerializer):
         model = CartItem
         fields = [
             'title',
-            'id',
             'product_id',
             'color',
             'size',

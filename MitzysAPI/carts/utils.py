@@ -13,3 +13,7 @@ def get_or_create_user_cart(user):
         return new_cart
     else:
         return cart_queryset[0]
+
+
+def user_is_authorized(user1, user2):
+    return user1 == user2

@@ -1,5 +1,5 @@
 from django.shortcuts import render
-from rest_framework import status, generics
+from rest_framework import status, generics, exceptions
 from rest_framework.response import Response
 from rest_framework.views import APIView
 from .serializers import RegisterUserSerializer, UserSerializer
@@ -13,9 +13,10 @@ from django.utils import timezone
 import jwt
 from django.conf import settings
 from django.contrib.auth import authenticate
+from .token_utils import *
 
 
-class UserCreate(APIView):
+class RegisterUser(APIView):
     permission_classes = [AllowAny]
 
     def post(self, request):
@@ -58,7 +59,7 @@ class VerfiyEmail(APIView):
 
     permission_classes = [AllowAny]
 
-    def get(self, request):
+    def post(self, request):
         token = request.GET.get('token')
         user_id = request.GET.get('user_id')
 
@@ -93,161 +94,134 @@ class VerfiyEmail(APIView):
                     status=status.HTTP_404_NOT_FOUND
                 )
 
-class UserListView(generics.ListAPIView):
-    # permission_classes = [AllowAny]
-    queryset = User.objects.all()
-    serializer_class = UserSerializer
-
-# View to logout and blacklist the token
 class LogoutView(APIView):
+
     permission_classes = [AllowAny]
+
+    """
+    This view deletes the refresh_token that is
+    stored in the HTTPOnly Cookie. Client will not 
+    be able to refresh access token. Will need
+    to re-authenticate.
+    """
 
     def post(self, request):
-        try:
-            refresh_token = request.data["refresh"]
-            blacklist_token(refresh_token) # Blacklisting prevents unauthorized usage 
-            return Response(status=status.HTTP_204_NO_CONTENT)
-        except Exception as e:
-            return Response(status=status.HTTP_400_BAD_REQUEST)
+        response = Response()
+        response.delete_cookie('refresh_token')
+        response.status = status.HTTP_200_OK
+        return response
 
-class LogoutAllView(APIView):
-
-    def post(self, request):
-        user_id = request.user.id # User id taken from given Access Token
-
-        tokens = OutstandingToken.objects.filter(user_id=user_id)
-        for token in tokens:
-            t, _ = BlacklistedToken.objects.get_or_create(token=token)
-        
-        return Response(data= {'status':'Logged out from all accounts!'}, status=status.HTTP_205_RESET_CONTENT)
-
-class GetTokenPairView(APIView):
+class RefreshTokenView(APIView):
 
     permission_classes = [AllowAny]
 
-    def get(self, request, format=None):
-        data = request.data
+    def post(self, request, format=None):
 
-        given_email = data["email"]  # Email submitted to the form on the frontend by the user
-        given_pswd = data['password']  # Password submitted to the form on the frontend by the user
+        refresh_token = request.COOKIES.get('refresh_token')
+        
+        if refresh_token is None:
+            raise exceptions.AuthenticationFailed('Refresh Token was not provided.')
 
         try:
-            requested_user = User.objects.get(email=given_email, is_active=True)
-        except User.DoesNotExist:
-            return Response(
-                {
-                    'msg': 'No active account matching given email.',
-                    'account_is_locked': False,
-                    'error': True
-                },
-                status=status.HTTP_404_NOT_FOUND
+            payload = jwt.decode(
+                refresh_token,
+                settings.REFRESH_TOKEN_SECRET,
+                algorithms=['HS256']
             )
-        
-        """
-        Check if the requested user has been locked. Include a link for password 
-        reset in the response.
-        """
+        except jwt.ExpiredSignatureError:
+            raise exceptions.AuthenticationFailed('Expired refresh token. Request new pair.')
+        except jwt.exceptions.InvalidSignatureError:
+            raise exceptions.AuthenticationFailed('Invalid refresh token. Request a valid token pair.')
 
-        if requested_user.is_locked:
-            return Response(
-                {
-                    'msg': 'Too many failed login attempts within a short period of time.',
-                    'account_is_locked': True,
-                    'error': True
-                },
-                status=status.HTTP_404_NOT_FOUND
-            )
+        user = User.objects.filter(id=payload.get('user_id')).first()
 
-        
-        """
-        Check if the credentials given match those on file. If so, reset the failed attempts
-        and return Access and Refresh tokens.
-        """
+        if user is None:
+            raise exceptions.AuthenticationFailed('User not found.')
 
-        password_is_correct = requested_user.check_password(given_pswd)
+        if not user.is_active:
+            raise exceptions.AuthenticationFailed('User is not active.')
 
-        if password_is_correct:
-            refresh = RefreshToken.for_user(requested_user)
+        if user.is_locked:
+            raise exceptions.AuthenticationFailed('User is locked.')
 
-            # Delete failed attempts to reset counter
-            FailedLoginAttempt.objects.filter(attempted_owner=requested_user).delete()
+        access_token = generate_access_token(user)
 
-            return Response(
-                {
-                    'msg': 'Successful login attempt',
-                    'refresh': str(refresh),
-                    'access': str(refresh.access_token),
-                    'account_is_locked': False,
-                    'expires_in': refresh.lifetime,
-                    'error': False
-                },
-                status=status.HTTP_200_OK
-            )
-        else:
+        response = Response()
+        response.data = {
+            'access_token': access_token
+        }
 
-            """
-            If the login attempt has failed, check how many failed attempts have occured
-            in the last five minutes and lock the account if neccesary. Include a link for password 
-            reset in the response.
-            """
+        response.status = status.HTTP_200_OK
 
-            five_minutes_ago = timezone.now() + timezone.timedelta(minutes=-5)
-            failed_attempt = FailedLoginAttempt(attempted_owner=requested_user)
-            failed_attempt.save()
+        return response
 
-            attempts_last_five_minutes = len(FailedLoginAttempt.objects.filter(attempted_at__gte=five_minutes_ago))
-            attempts_exceed_limit = True if (attempts_last_five_minutes >= 5) else False
+class LoginView(APIView):
 
-            if attempts_exceed_limit:
-                requested_user.is_locked = True
-                requested_user.save()
+    """
+    Given a valid `email` and `password` pair in the 
+    request JSON body, this view should return a response
+    containing a new access_token. In addition to this, 
+    a refresh_token will be created and stored in the 
+    HTTPOnly Cookies. This helps ensure only the server
+    will be able to see and use the refresh_token.
+    """
 
-            return Response(
-                {
-                    'msg': f'Failed login attempt',
-                    'failed attempts': f'{attempts_last_five_minutes}',
-                    'account_is_locked': attempts_exceed_limit,
-                    'error': True
-                },
-                status=status.HTTP_403_FORBIDDEN
-            )
-
-class RefreshAccessTokenView(APIView):
     permission_classes = [AllowAny]
 
+    def post(self, request, format=None):
+        email = request.data["email"]
+        password = request.data["password"]
 
-    def get(self, request, format=None):
-        data = request.data
-
-        given_refresh_token = data["refresh"]
-        try:
-            refresh_token = RefreshToken(given_refresh_token)
-            res = {
-                "access": str(refresh_token.access_token),
-                "expires_in": refresh_token.lifetime,
-                "error": False,
-            }
-
-            return Response(data=res, status=status.HTTP_200_OK)
-        except:
-            res = {
-                "msg": "The given refresh token was invalid.",
+        if (email is None) or (password is None):
+            response_data = {
+                "msg": "Email and password is required.",
                 "error": True
             }
-            return Response(data=res, status=status.HTTP_400_BAD_REQUEST)
+            return Response(response_data, status=status.HTTP_400_BAD_REQUEST)
 
-class PasswordResetView(APIView):
-    """
-    Setup password reset.
-    """
-    pass
+        user = User.objects.filter(email=email).first()
 
+        if user is None:
+            raise exceptions.AuthenticationFailed('User not found.')
 
+        if user.is_locked:
+            raise exceptions.AuthenticationFailed('Account is locked.')
+        
+        if not user.check_password(password):
 
-# class 
+            five_minutes_ago = timezone.now() + timezone.timedelta(minutes=-5)
+            failed_attempt = FailedLoginAttempt(attempted_owner=user)
+            failed_attempt.save()
 
-# ## TODO
-# # 1. Activate User Account via Email
-# # 2. Add login view to issue token and handle incorrect password limit
-# # 3. Create a link for password reset and include that in the response. 
-# # This will prevent another unneccesary http request.
+            attempts_last_five_minutes = len(FailedLoginAttempt.objects.filter(attempted_owner=user, attempted_at__gte=five_minutes_ago))
+            attempts_exceed_limit = attempts_last_five_minutes >= 5
+
+            print(attempts_exceed_limit)
+
+            if attempts_exceed_limit:
+                user.is_locked = True
+                user.save()
+                raise exceptions.AuthenticationFailed('Account is locked.')
+
+            raise exceptions.AuthenticationFailed('Bad credentials')
+
+        serialized_user = UserSerializer(user).data
+
+        response = Response()
+
+        access_token = generate_access_token(user)
+        refresh_token = generate_refresh_token(user)
+        
+
+        response.set_cookie(
+            key="refresh_token",
+            value=refresh_token,
+            httponly=True
+        )
+
+        response.data = {
+            'access_token': access_token,
+            'user': serialized_user,
+        }
+
+        return response

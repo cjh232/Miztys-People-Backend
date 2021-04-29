@@ -27,7 +27,9 @@ class AccountVerificationUtil:
         relative_link=reverse('verify_email')
         absolute_url=f'http://{current_site+relative_link}?user_id={user.id}&token={token}'
 
-        email_body = f'Hi {user.first_name} {user.last_name}!\nUse link below to verfiy your email\n{absolute_url}'
+        url = f'http://localhost:3000/verify?token={token}&user_id={user.id}'
+
+        email_body = f'Hi {user.first_name} {user.last_name}!\nUse link below to verfiy your email\n{url}'
 
         data={
             'body': email_body,
