@@ -1,5 +1,5 @@
 from django.db import models
-from products.models import Item
+from products.models import Variant
 from users.models import User
 import uuid
 
@@ -33,5 +33,5 @@ class OrderItem(models.Model):
                           editable=False)
 
     order = models.ForeignKey(Order, on_delete=models.CASCADE)
-    item = models.ForeignKey(Item, on_delete=models.CASCADE)
+    variant = models.ForeignKey(Variant, on_delete=models.CASCADE)
     created_at = models.DateTimeField(auto_now_add=True)

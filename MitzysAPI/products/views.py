@@ -1,5 +1,6 @@
 from django.shortcuts import render
-from .serializers import ProductSerializer
+from .serializers import *
+from django.db.models import Exists
 from rest_framework import status, generics
 from rest_framework.response import Response
 from rest_framework.views import APIView
@@ -8,114 +9,133 @@ from django_filters.rest_framework import DjangoFilterBackend
 from rest_framework.permissions import AllowAny
 from django.core.exceptions import ValidationError
 from .models import *
+from django.db.models import Q
 
 
-# Create your views here.
-class ProductList(generics.ListAPIView):
-    serializer_class = ProductSerializer
-    filter_backends = [DjangoFilterBackend, OrderingFilter]
-    filterset_fields = ['category__name', 'sub_category__name', 'brand__name']
-    ordering_fields = ['date_added', 'brand__name']
+def create_404_response(msg):
+    return Response({ "msg": msg, "error": True }, status=status.HTTP_404_NOT_FOUND)
 
-    # Default order
-    ordering = ['date_added']
 
+
+
+# class SearchProductView(generics.ListAPIView):
+#     serializer_class = ProductSerializer
+#     filter_backends = [SearchFilter]
+
+#     permission_classes = [AllowAny]
+
+#     search_fields = ['$title', 'details', 'brand__name']
+#     queryset = Product.objects.filter(is_available=True)
+
+
+class GetProductOptions(APIView):
     permission_classes = [AllowAny]
-    queryset = Product.objects.filter(is_available=True)
 
-
-class SearchProduct(generics.ListAPIView):
-    serializer_class = ProductSerializer
-    filter_backends = [SearchFilter]
-
-    permission_classes = [AllowAny]
-
-    search_fields = ['$title', 'details', 'brand__name']
-    queryset = Product.objects.filter(is_available=True)
-
-
-class GetAvailableSizes(APIView):
     """
-    Given product_id and color, returns the sizes available.
+    Given the product id and the color, this view should
+    return all the sizes vailable in this color.
     """
 
-    permission_classes = [AllowAny]
+    def get(self, request, p_id=None, format=None):
 
-    def get_queryset(self):
+        color = request.query_params.get('color')
 
-        return Item.objects.filter(
-            product__id=self.request.query_params.get("product_id"),
-            num_available__gte=1
-        )
+        try:
+            product = Product.objects.get(id=p_id, is_available=True)
+        except:
+            return create_404_response("Product does not exist or is not available.")
 
-    def get(self, request, format=None):
+        variants = Variant.objects.filter(product=p_id, quantity__gte=1, color__name=color)
 
-        item_queryset = self.get_queryset()
-        product_id = request.query_params.get("product_id")
-        color = request.query_params.get("color")
+        data = {}
 
-        if not item_queryset.exists():
-            return Response({
-                "msg": "No item with given product id was found.",
-                "error": True
-            }, status=status.HTTP_404_NOT_FOUND)
-
-        item_queryset_with_color_match = item_queryset.filter(color=color).distinct("size")
-
-        if not item_queryset_with_color_match.exists():
-            return Response({
-                "msg": "This product is not available in this color.",
-                "error": True
-            }, status=status.HTTP_404_NOT_FOUND)
-
-        available_sizes = item_queryset_with_color_match.values_list("size", "id")
-
-        response_data = {
-            "product_id": product_id,
-            "color": color,
-            "available-sizes": available_sizes
-        }
-
-        return Response(response_data, status=status.HTTP_200_OK)
+        data["color"] = color
+        data["sizes"] = variants.values_list('size__value', flat=True)
+        
+        return Response(data, status=status.HTTP_200_OK)
 
 
 class ProductDetailsView(APIView):
-    permission_classes = [AllowAny]
-    lookup_url_kwarg = 'product_id'
+    permission_classes = [AllowAny]    
 
-    @staticmethod
-    def get_product_available_colors(product_id):
-        items = Item.objects.filter(
-            product__id=product_id,
-            num_available__gte=1
-        ).distinct('color')
-
-        return items.values_list('color', flat=True)
+    """
+    Given the product id, this view should
+    return the details associated with this product.
+    This includes a list of available colors which will
+    be used thereafter to grab avaialble sizes.
+    """
 
     def get(self, request, p_id=None, format=None):
 
         try:
-            product_queryset = Product.objects.filter(id=p_id, is_available=True)
-        except ValidationError as error:
-            return Response({
-                "msg": "Given product id is formatted incorrectly.",
-                "error": True
-            }, status=status.HTTP_400_BAD_REQUEST)
+            product = Product.objects.get(id=p_id, is_available=True)
+        except:
+            return create_404_response("Product does not exist or is not available.")
 
-        if not product_queryset.exists():
-            return Response({
-                "msg": "No product with given id was found.",
-                "error": True
-            }, status=status.HTTP_404_NOT_FOUND)
+        serializer = ProductSerializer(product)
+        
+        return Response(serializer.data, status=status.HTTP_200_OK)
 
-        serializer = ProductSerializer(product_queryset[0])
 
-        available_colors = self.get_product_available_colors(p_id)
 
-        data = {}
+class VariantFilterView(APIView):
 
-        data.update(serializer.data)
+    permission_classes = [AllowAny]
 
-        data["available_colors"] = available_colors
+    def get(self, request, format=None):
 
-        return Response(data, status=status.HTTP_200_OK)
+        parse = lambda query: query.split(',') if (query is not None) else None
+
+        brands = parse(request.query_params.get("brand"))
+        category = request.query_params.get("category")
+        sizes = parse(request.query_params.get("size"))
+        colors = parse(request.query_params.get("color"))
+
+        variants = Variant.objects.all()
+
+        if sizes is not None:
+            variants = variants.filter(size__in=sizes)
+
+        if colors is not None:
+            variants = variants.filter(color__in=colors)
+
+        if brands is not None:
+            variants = variants.filter(product__brand__id__in=brands)
+
+        if category is not None:
+            variants = variants.filter(
+                Q(product__category__id=category)  
+                | Q(product__sub_category__id=category)
+            )
+
+        if not variants.exists():
+            return create_404_response("Filters returned no results.")
+
+        variants = variants.distinct('product')
+
+        serialized = VariantListSerializer(variants, many=True)
+        
+        
+        print(sizes, colors)
+
+        return Response(serialized.data, status=status.HTTP_200_OK)
+
+
+class BrandList(generics.ListAPIView):
+    permission_classes = [AllowAny]
+    serializer_class = BrandListSerializer
+    queryset = Brand.objects.all()
+
+
+class SizeList(generics.ListAPIView):
+    permission_classes = [AllowAny]
+    serializer_class = SizeListSerializer
+    queryset = Size.objects.all()
+
+class CategoryListView(generics.ListAPIView):
+    permission_classes = [AllowAny]
+    serializer_class = CategoryListSerializer
+    queryset = Category.objects.filter(parent=None)
+
+        
+    

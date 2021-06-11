@@ -13,6 +13,9 @@ class CSRFCheck(CsrfViewMiddleware):
 
 class JWTAuthentication(BaseAuthentication):
 
+    def authenticate_header(self, request):
+        return 'Request new authentication token pair.';
+
 
     def authenticate(self, request):
 
@@ -29,11 +32,11 @@ class JWTAuthentication(BaseAuthentication):
                 algorithms=['HS256']
             )
         except jwt.exceptions.InvalidSignatureError:
-            raise exceptions.AuthenticationFailed('access_token invalid')
+            raise exceptions.NotAuthenticated('access_token invalid')
         except jwt.ExpiredSignatureError:
-            raise exceptions.AuthenticationFailed('access_token expired')
+            raise exceptions.NotAuthenticated('access_token expired')
         except IndexError:
-            raise exceptions.AuthenticationFailed('Token prefix missing')
+            raise exceptions.NotAuthenticated('Token prefix missing')
 
         
         user = User.objects.filter(id=payload['user_id']).first()

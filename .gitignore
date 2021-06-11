@@ -116,3 +116,17 @@ GitHub.sublime-settings
 .history
 MitzysAPI/catalog/__pycache__/admin.cpython-39.pyc
 MitzysAPI/catalog/__pycache__/models.cpython-39.pyc
+MitzysAPI/MitzysAPI/__pycache__/settings.cpython-39.pyc
+MitzysAPI/MitzysAPI/__pycache__/urls.cpython-39.pyc
+MitzysAPI/catalog/__pycache__/__init__.cpython-39.pyc
+MitzysAPI/catalog/__pycache__/admin.cpython-39.pyc
+MitzysAPI/catalog/__pycache__/apps.cpython-39.pyc
+MitzysAPI/catalog/__pycache__/models.cpython-39.pyc
+MitzysAPI/catalog/__pycache__/serializers.cpython-39.pyc
+MitzysAPI/catalog/__pycache__/urls.cpython-39.pyc
+MitzysAPI/catalog/__pycache__/views.cpython-39.pyc
+MitzysAPI/catalog/migrations/__pycache__/__init__.cpython-39.pyc
+MitzysAPI/catalog/migrations/__pycache__/0001_initial.cpython-39.pyc
+MitzysAPI/users/__pycache__/urls.cpython-39.pyc
+MitzysAPI/users/__pycache__/utils.cpython-39.pyc
+MitzysAPI/users/__pycache__/views.cpython-39.pyc

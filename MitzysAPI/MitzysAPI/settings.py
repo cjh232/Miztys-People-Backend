@@ -46,7 +46,6 @@ INSTALLED_APPS = [
     'django.contrib.staticfiles',
     'users.apps.UsersConfig',
     'rest_framework',
-    'rest_framework_simplejwt.token_blacklist',
     'django_crontab',
     'django_filters',
     'corsheaders',
@@ -196,4 +195,10 @@ EMAIL_HOST_PASSWORD=os.getenv('EMAIL_HOST_PASSWORD')
 PASSWORD_RESET_TIMEOUT=60
 
 
-CORS_ORIGIN_ALLOW_ALL = True
+# CORS_ORIGIN_ALLOW_ALL = True
+CORS_ALLOW_CREDENTIALS = True
+CORS_ORIGIN_WHITELIST = (
+  'http://localhost:3000',
+  'http://localhost:8000',
+  'http://127.0.0.1:3000'
+)

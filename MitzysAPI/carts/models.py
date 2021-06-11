@@ -1,7 +1,7 @@
 from django.db import models
 import uuid
 from users.models import User
-from products.models import Product, Item
+from products.models import Product, Variant
 
 
 # Create your models here.
@@ -52,8 +52,8 @@ class CartItem(models.Model):
         related_name="cart_items"
     )
 
-    item = models.ForeignKey(
-        Item,
+    variant = models.ForeignKey(
+        Variant,
         on_delete=models.CASCADE,
         null=True
     )

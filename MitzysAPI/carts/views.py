@@ -5,7 +5,7 @@ from rest_framework.views import APIView
 from rest_framework.permissions import AllowAny
 from django.core.exceptions import ValidationError, ObjectDoesNotExist
 from .models import *
-from products.models import Item
+from products.models import Variant
 from .utils import *
 from .serializers import *
 
@@ -26,7 +26,7 @@ class AddItemToCartView(APIView):
         quantity = request.query_params.get(self.quantity_query_lookup)
 
         try:
-            item = Item.objects.get(id=item_id)
+            variant = Variant.objects.get(id=item_id)
         except ObjectDoesNotExist as error:
             data = {
                 "msg": "No item was found under the given id.",
@@ -34,7 +34,7 @@ class AddItemToCartView(APIView):
             }
             return Response(data, status=status.HTTP_400_BAD_REQUEST)
 
-        if item.num_available < int(quantity):
+        if variant.num_available < int(quantity):
             data = {
                 "msg": "You cannot add this item, with this quantity, to the cart.",
                 "error": True,
@@ -44,11 +44,11 @@ class AddItemToCartView(APIView):
         try:
 
             existing_cart_item = CartItem.objects.get(
-                item=item,
+                variant=variant,
                 cart=user_cart
             )
 
-            if item.num_available < existing_cart_item.quantity + int(quantity):
+            if variant.num_available < existing_cart_item.quantity + int(quantity):
                 data = {
                     "msg": "You cannot add this item, with this quantity, to the cart.",
                     "error": True,
@@ -60,7 +60,7 @@ class AddItemToCartView(APIView):
 
         except ObjectDoesNotExist as error:
 
-            cart_item = CartItem(cart=user_cart, item=item, quantity=quantity)
+            cart_item = CartItem(cart=user_cart, variant=variant, quantity=quantity)
             cart_item.save()
 
         response_data = {

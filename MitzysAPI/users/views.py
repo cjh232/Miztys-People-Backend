@@ -104,6 +104,8 @@ class LogoutView(APIView):
 
     def post(self, request):
         response = Response()
+        refresh_token = request.COOKIES.get('refresh_token')
+        print(refresh_token)
         response.delete_cookie('refresh_token')
         response.status = status.HTTP_200_OK
         return response
@@ -179,10 +181,10 @@ class LoginView(APIView):
         user = User.objects.filter(email=email).first()
 
         if user is None:
-            raise exceptions.AuthenticationFailed('User not found.')
+            raise exceptions.AuthenticationFailed('Bad Credentials')
 
         if user.is_locked:
-            raise exceptions.AuthenticationFailed('Account is locked.')
+            raise exceptions.AuthenticationFailed('Locked Account')
         
         if not user.check_password(password):
 
@@ -198,9 +200,9 @@ class LoginView(APIView):
             if attempts_exceed_limit:
                 user.is_locked = True
                 user.save()
-                raise exceptions.AuthenticationFailed('Account is locked.')
+                raise exceptions.AuthenticationFailed('Locked Account')
 
-            raise exceptions.AuthenticationFailed('Bad credentials')
+            raise exceptions.AuthenticationFailed('Bad Credentials')
 
         serialized_user = UserSerializer(user).data
 
@@ -213,12 +215,24 @@ class LoginView(APIView):
         response.set_cookie(
             key="refresh_token",
             value=refresh_token,
-            httponly=True
+            httponly=True,
+            samesite=None,
+            secure=False
         )
+
+        print(refresh_token)
 
         response.data = {
             'access_token': access_token,
-            'user': serialized_user,
+            'first_name': user.first_name
         }
 
         return response
+
+
+class UserDetailView(APIView):
+
+    def get(self, request, format=None):
+        user = request.user
+
+        return Response({'user': user.id}, status=status.HTTP_200_OK)
